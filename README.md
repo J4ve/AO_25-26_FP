@@ -1,5 +1,4 @@
-# AO_25-26_FP
-Architecture and Organization Final Project
+# Architecture and Organization Final Project
 
 [Document](https://docs.google.com/document/d/1R6AQQbYqJi5osiLXs_nGPCNXFPG_qnHWZxikHWBiQ4U/edit?usp=sharing)
 
