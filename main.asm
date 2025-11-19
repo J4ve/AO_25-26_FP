@@ -1,5 +1,5 @@
 ; =========================================================
-; Employee Record Tracker - Phase 3: Grouped Display + Error Handling
+; Employee Record Tracker - Phase 4: Complete (Add + Display + Search + Delete)
 ; =========================================================
 section .data
     EOF equ -1
@@ -46,6 +46,17 @@ section .data
     ; Grouped display messages
     display_pos_header db 10, "Position: %s", 10, 0
     no_emp_msg db "No employees in database.", 10, 0
+    
+    ; Delete messages
+    delete_menu db 10, "## Delete Employee ##", 10
+                db "[1] Delete by Name", 10
+                db "[2] Delete by Position", 10
+                db "Enter your choice: ", 0
+    
+    delete_name_prompt db "Enter name to delete: ", 0
+    delete_pos_prompt db "Enter position to delete: ", 0
+    deleted_msg db "Employee(s) deleted successfully!", 10, 0
+    not_deleted_msg db "No employees deleted.", 10, 0
     
 section .bss
     employees resb 640      ; 10 * 64 = 640 bytes
@@ -118,9 +129,256 @@ menu:
     jmp menu
     
 delete_emp:
-    push not_impl
+    push ebp
+    mov ebp, esp
+    
+    push delete_menu
     call _printf
     add esp, 4
+    
+    push choice
+    push fmt_int
+    call _scanf
+    add esp, 8
+    
+    ; Check if scanf succeeded
+    cmp eax, 1
+    jne .invalid_input
+    
+    call clear_stdin_buffer
+    
+    mov eax, [choice]
+    cmp eax, 1
+    je .delete_by_name
+    cmp eax, 2
+    je .delete_by_position
+    
+.invalid_input:
+    call clear_stdin_buffer
+    push invalid_msg
+    call _printf
+    add esp, 4
+    jmp .end
+    
+.delete_by_name:
+    push delete_name_prompt
+    call _printf
+    add esp, 4
+    
+    push buffer
+    push fmt_str
+    call _scanf
+    add esp, 8
+    call clear_stdin_buffer
+    
+    mov dword [found_flag], 0
+    mov ecx, [count]
+    xor esi, esi
+    
+.loop_name:
+    cmp esi, ecx
+    jge .check_deleted
+    
+    push ecx
+    push esi
+    
+    ; Get employee name address
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    
+    ; Compare strings
+    push buffer
+    push edi
+    call _strcmp
+    add esp, 8
+    
+    pop esi
+    pop ecx
+    
+    ; If strcmp returns 0, strings match - delete this employee
+    cmp eax, 0
+    jne .next_name
+    
+    ; Mark that we found a match
+    mov dword [found_flag], 1
+    
+    ; Shift all subsequent employees down by one slot
+    push ecx
+    push esi
+    
+    mov edx, esi
+.shift_loop_name:
+    inc edx
+    cmp edx, ecx
+    jge .shift_done_name
+    
+    push ecx
+    push edx
+    
+    ; Calculate source address (employee at index edx)
+    mov eax, edx
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    
+    ; Calculate destination address (employee at index edx-1)
+    mov eax, edx
+    dec eax
+    imul eax, EMPLOYEE_SIZE
+    lea ebx, [employees]
+    add ebx, eax
+    
+    ; Copy employee (64 bytes)
+    mov ecx, EMPLOYEE_SIZE
+.copy_loop_name:
+    mov al, [edi]
+    mov [ebx], al
+    inc edi
+    inc ebx
+    loop .copy_loop_name
+    
+    pop edx
+    pop ecx
+    jmp .shift_loop_name
+    
+.shift_done_name:
+    pop esi
+    pop ecx
+    
+    ; Decrement count
+    dec dword [count]
+    dec ecx
+    
+    ; Don't increment esi - check same position again
+    jmp .loop_name
+    
+.next_name:
+    inc esi
+    jmp .loop_name
+    
+.delete_by_position:
+    push delete_pos_prompt
+    call _printf
+    add esp, 4
+    
+    push buffer
+    push fmt_str
+    call _scanf
+    add esp, 8
+    call clear_stdin_buffer
+    
+    mov dword [found_flag], 0
+    mov ecx, [count]
+    xor esi, esi
+    
+.loop_position:
+    cmp esi, ecx
+    jge .check_deleted
+    
+    push ecx
+    push esi
+    
+    ; Get employee position address
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    add edi, NAME_SIZE
+    
+    ; Compare strings
+    push buffer
+    push edi
+    call _strcmp
+    add esp, 8
+    
+    pop esi
+    pop ecx
+    
+    ; If strcmp returns 0, strings match - delete this employee
+    cmp eax, 0
+    jne .next_position
+    
+    ; Mark that we found a match
+    mov dword [found_flag], 1
+    
+    ; Shift all subsequent employees down by one slot
+    push ecx
+    push esi
+    
+    mov edx, esi
+.shift_loop_pos:
+    inc edx
+    cmp edx, ecx
+    jge .shift_done_pos
+    
+    push ecx
+    push edx
+    
+    ; Calculate source address (employee at index edx)
+    mov eax, edx
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    
+    ; Calculate destination address (employee at index edx-1)
+    mov eax, edx
+    dec eax
+    imul eax, EMPLOYEE_SIZE
+    lea ebx, [employees]
+    add ebx, eax
+    
+    ; Copy employee (64 bytes)
+    mov ecx, EMPLOYEE_SIZE
+.copy_loop_pos:
+    mov al, [edi]
+    mov [ebx], al
+    inc edi
+    inc ebx
+    loop .copy_loop_pos
+    
+    pop edx
+    pop ecx
+    jmp .shift_loop_pos
+    
+.shift_done_pos:
+    pop esi
+    pop ecx
+    
+    ; Decrement count
+    dec dword [count]
+    dec ecx
+    
+    ; Don't increment esi - check same position again
+    jmp .loop_position
+    
+.next_position:
+    inc esi
+    jmp .loop_position
+    
+.check_deleted:
+    cmp dword [found_flag], 0
+    jne .deleted
+    push not_deleted_msg
+    call _printf
+    add esp, 4
+    jmp .press_enter
+    
+.deleted:
+    push deleted_msg
+    call _printf
+    add esp, 4
+    
+.press_enter:
+    push press_enter
+    call _printf
+    add esp, 4
+    call clear_stdin_buffer
+    
+.end:
+    mov esp, ebp
+    pop ebp
     jmp menu
     
 search_emp:
