@@ -1,5 +1,13 @@
 ; =========================================================
-; Employee Record Tracker - Phase 5: Enhanced UI Formatting
+; Employee Record Tracker
+;
+; GROUP MEMBERS:
+;
+; BACSAIN, JAVE A.
+; BONGALOS, BLESSIE FAITH S.
+; ORTINERO, FREDERICK D.
+; RICAFORT, DIVINO AL D.
+;
 ; =========================================================
 section .data
     EOF equ -1
@@ -8,7 +16,7 @@ section .data
     NAME_SIZE equ 32
     
     fmt_int db "%d", 0
-    fmt_str db "%31s", 0
+    fmt_str db " %31[^\n]", 0
     fmt_display db "Name: %s - Position: %s", 10, 0
     format_employee db "  %-3d %-20s %-20s",10,0
     
@@ -77,6 +85,9 @@ section .data
     deleted_msg db "Employee(s) deleted successfully!", 10, 0
     not_deleted_msg db "No employees deleted.", 10, 0
     
+    ; File mode for fdopen
+    mode_read db "r", 0
+    
 section .bss
     employees resb 640      ; 10 * 64 = 640 bytes
     count resd 1
@@ -86,9 +97,34 @@ section .bss
     temp_buffer resb 64     ; temporary buffer for position comparison
     position_printed resb 32 ; track which positions we've printed
     
+    ; Storage for stdin handle
+    stdin_handle resd 1
+    
 section .text
     global _main
-    extern _printf, _scanf, _strcpy, _getchar, _strcmp
+    extern _printf, _scanf, _strcpy, _getchar, _strcmp, _fgets, _fdopen, _strlen
+    
+; ---------------------------------------------------------
+; remove_newline: remove trailing newline from string
+; ---------------------------------------------------------
+remove_newline:
+    push ebp
+    mov ebp, esp
+    mov esi, [ebp+8]
+    push esi
+    call _strlen
+    add esp, 4
+    cmp eax, 0
+    jz .done
+    dec eax
+    add esi, eax
+    cmp byte [esi], 0Ah
+    jne .done
+    mov byte [esi], 0
+.done:
+    mov esp, ebp
+    pop ebp
+    ret
     
 ; ---------------------------------------------------------
 ; clear_stdin_buffer: flush remaining input until newline
@@ -110,6 +146,16 @@ clear_stdin_buffer:
 ; _main: program entry point
 ; ---------------------------------------------------------
 _main:
+    push ebp
+    mov ebp, esp
+    
+    ; Initialize STDIN Handle dynamically
+    push mode_read      ; "r"
+    push 0              ; File Descriptor 0 (Standard Input)
+    call _fdopen
+    add esp, 8
+    mov [stdin_handle], eax  ; Store the FILE* pointer
+    
     mov dword [count], 0
     
 menu:
@@ -220,11 +266,15 @@ delete_emp:
     call _printf
     add esp, 4
     
+    push dword [stdin_handle]
+    push dword 64
     push buffer
-    push fmt_str
-    call _scanf
-    add esp, 8
-    call clear_stdin_buffer
+    call _fgets
+    add esp, 12
+    
+    push buffer
+    call remove_newline
+    add esp, 4
     
     mov dword [found_flag], 0
     mov ecx, [count]
@@ -318,11 +368,15 @@ delete_emp:
     call _printf
     add esp, 4
     
+    push dword [stdin_handle]
+    push dword 64
     push buffer
-    push fmt_str
-    call _scanf
-    add esp, 8
-    call clear_stdin_buffer
+    call _fgets
+    add esp, 12
+    
+    push buffer
+    call remove_newline
+    add esp, 4
     
     mov dword [found_flag], 0
     mov ecx, [count]
@@ -485,11 +539,15 @@ search_emp:
     call _printf
     add esp, 4
     
+    push dword [stdin_handle]
+    push dword 64
     push buffer
-    push fmt_str
-    call _scanf
-    add esp, 8
-    call clear_stdin_buffer
+    call _fgets
+    add esp, 12
+    
+    push buffer
+    call remove_newline
+    add esp, 4
     
     mov dword [found_flag], 0
     mov ecx, [count]
@@ -566,11 +624,15 @@ search_emp:
     call _printf
     add esp, 4
     
+    push dword [stdin_handle]
+    push dword 64
     push buffer
-    push fmt_str
-    call _scanf
-    add esp, 8
-    call clear_stdin_buffer
+    call _fgets
+    add esp, 12
+    
+    push buffer
+    call remove_newline
+    add esp, 4
     
     mov dword [found_flag], 0
     mov ecx, [count]
@@ -678,11 +740,15 @@ add_emp:
     call _printf
     add esp, 4
     
+    push dword [stdin_handle]
+    push dword 64
     push buffer
-    push fmt_str
-    call _scanf
-    add esp, 8
-    call clear_stdin_buffer
+    call _fgets
+    add esp, 12
+    
+    push buffer
+    call remove_newline
+    add esp, 4
     
     ; Copy to employee array
     mov eax, [count]
@@ -700,11 +766,15 @@ add_emp:
     call _printf
     add esp, 4
     
+    push dword [stdin_handle]
+    push dword 64
     push buffer
-    push fmt_str
-    call _scanf
-    add esp, 8
-    call clear_stdin_buffer
+    call _fgets
+    add esp, 12
+    
+    push buffer
+    call remove_newline
+    add esp, 4
     
     ; Copy position (offset +32)
     add edi, NAME_SIZE
@@ -1013,4 +1083,7 @@ exit:
     push exit_msg
     call _printf
     add esp, 4
+    xor eax, eax
+    mov esp, ebp
+    pop ebp
     ret
