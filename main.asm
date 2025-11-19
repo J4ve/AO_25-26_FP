@@ -1,4 +1,4 @@
-; Employee Record Tracker - NASM Win32
+; Employee Record Tracker - NASM Win32 - FIXED (STDIN version)
 ; Compile with: nasm -f win32 employee.asm -o employee.o
 ; Link with: gcc -m32 employee.o -o employee.exe
 
@@ -9,14 +9,16 @@ extern _strcmp
 extern _strcpy
 extern _strlen
 extern _stricmp
+extern _fgets
+extern _fdopen      ; ADDED: To get stdin handle dynamically
 
 global _main
 
 section .data
     ; Menu strings
     menu_title db 10,"========================================",10
-               db "    EMPLOYEE RECORD TRACKER SYSTEM",10
-               db "========================================",10,0
+                 db "      EMPLOYEE RECORD TRACKER SYSTEM",10
+                 db "========================================",10,0
     menu_opt1 db "1. Add Employee",10,0
     menu_opt2 db "2. Delete Employee by Name",10,0
     menu_opt3 db "3. Delete Employee by Position",10,0
@@ -45,46 +47,81 @@ section .data
     msg_no_match db 10,"No employees found with that position!",10,0
     msg_confirm db 10,"Delete %d employee(s) with position '%s'? (y/n): ",0
     msg_cancelled db "Operation cancelled.",10,0
+    msg_input_error db 10,"Input error or empty name/position.",10,0
     
     ; Display headers
     header_all db 10,"========================================",10
-               db "  NO.  NAME                POSITION",10
-               db "========================================",10,0
+                 db "  NO.   NAME                  POSITION",10
+                 db "========================================",10,0
     header_search db 10,"========================================",10
-                  db "  SEARCH RESULTS",10
-                  db "========================================",10,0
-    header_grouped db 10,"========================================",10
-                   db "  EMPLOYEES GROUPED BY POSITION",10
+                   db "  SEARCH RESULTS",10
                    db "========================================",10,0
-    format_employee db "  %-3d  %-20s %-20s",10,0
+    header_grouped db 10,"========================================",10
+                      db "  EMPLOYEES GROUPED BY POSITION",10
+                      db "========================================",10,0
+    format_employee db "  %-3d %-20s %-20s",10,0
     format_position_header db 10,"Position: %s",10
-                           db "----------------------------------------",10,0
+                            db "----------------------------------------",10,0
     
     ; Scanf formats
     scan_int db "%d",0
-    scan_str db "%49s",0
     scan_char db " %c",0
+    
+    ; File mode for fdopen
+    mode_read db "r", 0
     
     MAX_EMPLOYEES equ 10
     NAME_SIZE equ 50
     POSITION_SIZE equ 50
+    EMPLOYEE_RECORD_SIZE equ 100
 
 section .bss
-    ; Employee structure: name (50 bytes) + position (50 bytes) = 100 bytes
-    employees resb MAX_EMPLOYEES * 100
+    ; Employee structure
+    employees resb MAX_EMPLOYEES * EMPLOYEE_RECORD_SIZE
     employee_count resd 1
     choice resd 1
     temp_name resb NAME_SIZE
     temp_position resb POSITION_SIZE
     temp_char resb 1
     search_buffer resb NAME_SIZE
+    
+    ; Storage for stdin handle
+    stdin_handle resd 1
 
 section .text
+
+; Helper function to remove trailing newline
+remove_newline:
+    push ebp
+    mov ebp, esp
+    mov esi, [ebp+8]
+    push esi
+    call _strlen
+    add esp, 4 
+    cmp eax, 0
+    jz .done
+    dec eax 
+    add esi, eax
+    cmp byte [esi], 0Ah 
+    jne .done
+    mov byte [esi], 0 
+.done:
+    mov esp, ebp
+    pop ebp
+    ret
+
 _main:
     push ebp
     mov ebp, esp
     
-    ; Initialize employee count
+    ; === FIX: Initialize STDIN Handle dynamically ===
+    push mode_read      ; "r"
+    push 0              ; File Descriptor 0 (Standard Input)
+    call _fdopen
+    add esp, 8
+    mov [stdin_handle], eax  ; Store the FILE* pointer
+    ; ================================================
+    
     mov dword [employee_count], 0
     
 main_loop:
@@ -109,7 +146,6 @@ main_loop:
     cmp eax, 8
     je exit_program
     
-    ; Invalid choice
     push msg_invalid
     call _printf
     add esp, 4
@@ -153,43 +189,33 @@ exit_program:
 display_menu:
     push ebp
     mov ebp, esp
-    
     push menu_title
     call _printf
     add esp, 4
-    
     push menu_opt1
     call _printf
     add esp, 4
-    
     push menu_opt2
     call _printf
     add esp, 4
-    
     push menu_opt3
     call _printf
     add esp, 4
-    
     push menu_opt4
     call _printf
     add esp, 4
-    
     push menu_opt5
     call _printf
     add esp, 4
-    
     push menu_opt6
     call _printf
     add esp, 4
-    
     push menu_opt7
     call _printf
     add esp, 4
-    
     push menu_opt8
     call _printf
     add esp, 4
-    
     mov esp, ebp
     pop ebp
     ret
@@ -198,18 +224,14 @@ display_menu:
 get_choice:
     push ebp
     mov ebp, esp
-    
     push menu_prompt
     call _printf
     add esp, 4
-    
     push choice
     push scan_int
     call _scanf
     add esp, 8
-    
-    call _getchar  ; Clear newline
-    
+    call _getchar   ; Clear newline
     mov esp, ebp
     pop ebp
     ret
@@ -219,74 +241,74 @@ add_employee:
     push ebp
     mov ebp, esp
     
-    ; Check if full
     mov eax, [employee_count]
     cmp eax, MAX_EMPLOYEES
     jge .full
     
-    ; Get name
     push prompt_name
     call _printf
     add esp, 4
     
+    ; FIX: Use [stdin_handle]
+    push dword [stdin_handle]
+    push dword NAME_SIZE
     push temp_name
-    push scan_str
-    call _scanf
-    add esp, 8
-    call _getchar
+    call _fgets
+    add esp, 12
     
-    ; Validate name (check if not empty)
+    push temp_name
+    call remove_newline
+    add esp, 4
+    
     push temp_name
     call _strlen
     add esp, 4
     test eax, eax
     jz .invalid_input
     
-    ; Get position
     push prompt_position
     call _printf
     add esp, 4
     
+    ; FIX: Use [stdin_handle]
+    push dword [stdin_handle]
+    push dword POSITION_SIZE
     push temp_position
-    push scan_str
-    call _scanf
-    add esp, 8
-    call _getchar
+    call _fgets
+    add esp, 12
     
-    ; Validate position
+    push temp_position
+    call remove_newline
+    add esp, 4
+    
     push temp_position
     call _strlen
     add esp, 4
     test eax, eax
     jz .invalid_input
     
-    ; Calculate offset for new employee
     mov eax, [employee_count]
-    mov ebx, 100  ; Size of each employee record
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov edi, employees
     add edi, eax
     
-    ; Copy name
     push temp_name
     push edi
     call _strcpy
     add esp, 8
     
-    ; Copy position
     add edi, NAME_SIZE
     push temp_position
     push edi
     call _strcpy
     add esp, 8
     
-    ; Increment count
     inc dword [employee_count]
     
     push msg_added
     call _printf
     add esp, 4
-    
     jmp .done
 
 .full:
@@ -296,7 +318,7 @@ add_employee:
     jmp .done
 
 .invalid_input:
-    push msg_invalid
+    push msg_input_error
     call _printf
     add esp, 4
 
@@ -310,41 +332,42 @@ delete_by_name:
     push ebp
     mov ebp, esp
     
-    ; Check if empty
     mov eax, [employee_count]
     test eax, eax
     jz .empty
     
-    ; Get name to delete
     push prompt_delete_name
     call _printf
     add esp, 4
     
+    ; FIX: Use [stdin_handle]
+    push dword [stdin_handle]
+    push dword NAME_SIZE
     push search_buffer
-    push scan_str
-    call _scanf
-    add esp, 8
-    call _getchar
+    call _fgets
+    add esp, 12
     
-    ; Search and delete
-    xor ecx, ecx  ; Index counter
+    push search_buffer
+    call remove_newline
+    add esp, 4
     
+    xor ecx, ecx    
 .search_loop:
     cmp ecx, [employee_count]
     jge .not_found
     
-    ; Calculate offset
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
     
-    ; Compare names (case-insensitive)
+    push ecx           
     push search_buffer
     push esi
     call _stricmp
     add esp, 8
+    pop ecx            
     
     test eax, eax
     jz .found
@@ -353,40 +376,29 @@ delete_by_name:
     jmp .search_loop
 
 .found:
-    ; Shift all employees after this one
-    mov edi, ecx  ; Start index
-    
-.shift_loop:
-    mov eax, edi
-    inc eax
-    cmp eax, [employee_count]
-    jge .shift_done
-    
-    ; Calculate source (next employee)
-    mov eax, edi
-    inc eax
-    mov ebx, 100
+    mov eax, ecx
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
-    mov esi, employees
-    add esi, eax
+    mov edi, employees
+    add edi, eax
     
-    ; Calculate destination (current employee)
-    mov eax, edi
-    mov ebx, 100
-    mul ebx
-    mov edx, employees
-    add edx, eax
+    mov esi, edi
+    add esi, EMPLOYEE_RECORD_SIZE
     
-    ; Copy 100 bytes
-    push ecx
-    mov ecx, 100
-    rep movsb
-    pop ecx
+    mov eax, [employee_count]
+    dec eax                 
+    sub eax, ecx            
+    mov edx, 100            
+    mul edx                 
     
-    inc edi
-    jmp .shift_loop
-
-.shift_done:
+    push ecx                
+    push ebx                
+    mov ecx, eax            
+    shr ecx, 2              
+    rep movsd               
+    pop ebx                 
+    pop ecx                 
+    
     dec dword [employee_count]
     
     push msg_deleted
@@ -414,35 +426,37 @@ delete_by_name:
 delete_by_position:
     push ebp
     mov ebp, esp
-    sub esp, 8
+    sub esp, 4
     
-    ; Check if empty
     mov eax, [employee_count]
     test eax, eax
     jz .empty
     
-    ; Get position to delete
     push prompt_delete_pos
     call _printf
     add esp, 4
     
+    ; FIX: Use [stdin_handle]
+    push dword [stdin_handle]
+    push dword NAME_SIZE
     push search_buffer
-    push scan_str
-    call _scanf
-    add esp, 8
-    call _getchar
+    call _fgets
+    add esp, 12
     
-    ; Count matches first
-    xor ecx, ecx  ; Index
-    xor edx, edx  ; Match count
-    mov dword [ebp-4], 0  ; Store match count
+    push search_buffer
+    call remove_newline
+    add esp, 4
+    
+    xor ecx, ecx    
+    xor edx, edx    
+    mov dword [ebp-4], 0 
     
 .count_loop:
     cmp ecx, [employee_count]
     jge .count_done
     
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
@@ -470,7 +484,6 @@ delete_by_position:
     test edx, edx
     jz .no_match
     
-    ; Confirm deletion
     push search_buffer
     push edx
     push msg_confirm
@@ -495,19 +508,18 @@ delete_by_position:
     jmp .done
 
 .do_delete:
-    ; Delete all matching positions
     xor ecx, ecx
-    
 .delete_loop:
     cmp ecx, [employee_count]
     jge .delete_done
     
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
-    add esi, NAME_SIZE
+    mov edi, esi
+    add esi, NAME_SIZE 
     
     push ecx
     push search_buffer
@@ -519,44 +531,28 @@ delete_by_position:
     test eax, eax
     jnz .delete_next
     
-    ; Found match, shift array
-    mov edi, ecx
+    mov esi, edi
+    add esi, EMPLOYEE_RECORD_SIZE
     
-.shift_loop2:
-    mov eax, edi
-    inc eax
-    cmp eax, [employee_count]
-    jge .shift_done2
+    mov eax, [employee_count]
+    dec eax                 
+    sub eax, ecx            
+    mov edx, 100
+    mul edx                 
     
-    mov eax, edi
-    inc eax
-    mov ebx, 100
-    mul ebx
-    mov esi, employees
-    add esi, eax
+    push ecx                
+    push ebx                
+    mov ecx, eax            
+    shr ecx, 2              
+    rep movsd               
+    pop ebx                 
+    pop ecx                 
     
-    mov eax, edi
-    mov ebx, 100
-    mul ebx
-    push edi
-    mov edi, employees
-    add edi, eax
-    
-    push ecx
-    mov ecx, 100
-    rep movsb
-    pop ecx
-    pop edi
-    
-    inc edi
-    jmp .shift_loop2
-
-.shift_done2:
     dec dword [employee_count]
     jmp .delete_loop
 
 .delete_next:
-    inc ecx
+    inc ecx                 
     jmp .delete_loop
 
 .delete_done:
@@ -594,20 +590,24 @@ search_by_name:
     call _printf
     add esp, 4
     
+    ; FIX: Use [stdin_handle]
+    push dword [stdin_handle]
+    push dword NAME_SIZE
     push search_buffer
-    push scan_str
-    call _scanf
-    add esp, 8
-    call _getchar
+    call _fgets
+    add esp, 12
+    
+    push search_buffer
+    call remove_newline
+    add esp, 4
     
     xor ecx, ecx
-    
 .search_loop:
     cmp ecx, [employee_count]
     jge .not_found
     
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
@@ -631,21 +631,24 @@ search_by_name:
     add esp, 4
     
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
     
-    push esi
+    push esi            
     add esi, NAME_SIZE
     push esi
     sub esi, NAME_SIZE
+    push esi            
     
-    inc ecx
-    push ecx
+    mov eax, ecx
+    inc eax
+    push eax            
     push format_employee
     call _printf
     add esp, 16
+    
     jmp .done
 
 .not_found:
@@ -678,30 +681,35 @@ search_by_position:
     call _printf
     add esp, 4
     
+    ; FIX: Use [stdin_handle]
+    push dword [stdin_handle]
+    push dword NAME_SIZE
     push search_buffer
-    push scan_str
-    call _scanf
-    add esp, 8
-    call _getchar
+    call _fgets
+    add esp, 12
+    
+    push search_buffer
+    call remove_newline
+    add esp, 4
     
     push header_search
     call _printf
     add esp, 4
     
     xor ecx, ecx
-    mov dword [ebp-4], 0  ; Found counter
+    mov dword [ebp-4], 0
     
 .search_loop:
     cmp ecx, [employee_count]
     jge .check_found
     
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
     
-    push esi
+    push esi 
     add esi, NAME_SIZE
     
     push ecx
@@ -710,30 +718,29 @@ search_by_position:
     call _stricmp
     add esp, 8
     pop ecx
-    pop esi
+    pop esi 
     
     test eax, eax
     jnz .next
     
     inc dword [ebp-4]
     
-    push esi
-    push ecx
+    push esi            
     add esi, NAME_SIZE
     push esi
     sub esi, NAME_SIZE
-    push esi
+    push esi            
     
     mov eax, ecx
     inc eax
-    push eax
+    push eax            
     push format_employee
     call _printf
     add esp, 16
     
-    pop ecx
     pop esi
-
+    pop esi
+    
 .next:
     inc ecx
     jmp .search_loop
@@ -771,32 +778,51 @@ display_all:
     call _printf
     add esp, 4
     
-    xor ecx, ecx
+    xor ecx, ecx    ; Loop counter
     
 .display_loop:
     cmp ecx, [employee_count]
     jge .done
     
+    ; Calculate address of current employee
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
     
-    push esi
-    add esi, NAME_SIZE
-    push esi
-    sub esi, NAME_SIZE
+    ; === CRITICAL FIX STARTS HERE ===
+    
+    ; 1. Save the Loop Counter
+    ; printf will overwrite ECX, so we must save it on the stack
+    push ecx  
+    
+    ; 2. Prepare Arguments for printf (Right-to-Left)
+    
+    ; Arg 3: Position String (Address is ESI + 50)
+    lea eax, [esi + NAME_SIZE] 
+    push eax
+    
+    ; Arg 2: Name String (Address is ESI)
     push esi
     
+    ; Arg 1: Index Number (ECX + 1)
     mov eax, ecx
     inc eax
     push eax
-    push format_employee
-    call _printf
-    add esp, 16
     
-    pop esi
+    ; Arg 0: Format String
+    push format_employee
+    
+    ; 3. Call printf
+    call _printf
+    add esp, 16     ; Clean up arguments (4 args * 4 bytes)
+    
+    ; 4. Restore the Loop Counter
+    pop ecx
+    
+    ; === CRITICAL FIX ENDS HERE ===
+    
     inc ecx
     jmp .display_loop
 
@@ -814,7 +840,7 @@ display_all:
 display_grouped:
     push ebp
     mov ebp, esp
-    sub esp, 200  ; Space for tracking displayed positions
+    sub esp, MAX_EMPLOYEES * NAME_SIZE
     
     mov eax, [employee_count]
     test eax, eax
@@ -824,24 +850,21 @@ display_grouped:
     call _printf
     add esp, 4
     
-    xor ecx, ecx  ; Outer loop
-    
+    xor ecx, ecx
 .outer_loop:
     cmp ecx, [employee_count]
     jge .done
     
-    ; Get position of current employee
     mov eax, ecx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov esi, employees
     add esi, eax
     add esi, NAME_SIZE
     
-    ; Check if we already displayed this position
     push ecx
     push esi
-    lea edi, [ebp-200]
+    lea edi, [ebp - MAX_EMPLOYEES * NAME_SIZE]
     xor edx, edx
     
 .check_displayed:
@@ -867,13 +890,12 @@ display_grouped:
     pop esi
     pop ecx
     
-    ; Store this position as displayed
     push ecx
     push esi
     mov eax, ecx
     mov ebx, NAME_SIZE
     mul ebx
-    lea edi, [ebp-200]
+    lea edi, [ebp - MAX_EMPLOYEES * NAME_SIZE]
     add edi, eax
     
     push esi
@@ -884,22 +906,19 @@ display_grouped:
     pop esi
     pop ecx
     
-    ; Display position header
     push esi
     push format_position_header
     call _printf
     add esp, 8
     
-    ; Display all employees with this position
     push ecx
     xor edx, edx
-    
 .inner_loop:
     cmp edx, [employee_count]
     jge .inner_done
     
     mov eax, edx
-    mov ebx, 100
+    mov ebx, EMPLOYEE_RECORD_SIZE
     mul ebx
     mov edi, employees
     add edi, eax
@@ -917,22 +936,21 @@ display_grouped:
     test eax, eax
     jnz .inner_next
     
-    push edx
-    push edi
+    push edi            
     add edi, NAME_SIZE
     push edi
     sub edi, NAME_SIZE
-    push edi
+    push edi            
     
     mov eax, edx
     inc eax
-    push eax
+    push eax            
     push format_employee
     call _printf
     add esp, 16
     
     pop edi
-    pop edx
+    pop edi
 
 .inner_next:
     inc edx
