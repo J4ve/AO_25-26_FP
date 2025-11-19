@@ -1,5 +1,5 @@
 ; =========================================================
-; Employee Record Tracker - Phase 2: Add + Display + Search
+; Employee Record Tracker - Phase 3: Grouped Display + Error Handling
 ; =========================================================
 section .data
     EOF equ -1
@@ -43,12 +43,18 @@ section .data
     not_found_msg db "No employees found.", 10, 0
     found_msg db "Found employee(s):", 10, 0
     
+    ; Grouped display messages
+    display_pos_header db 10, "Position: %s", 10, 0
+    no_emp_msg db "No employees in database.", 10, 0
+    
 section .bss
     employees resb 640      ; 10 * 64 = 640 bytes
     count resd 1
     buffer resb 64
     choice resd 1
     found_flag resd 1       ; flag to track if any match found
+    temp_buffer resb 64     ; temporary buffer for position comparison
+    position_printed resb 32 ; track which positions we've printed
     
 section .text
     global _main
@@ -85,6 +91,11 @@ menu:
     push fmt_int
     call _scanf
     add esp, 8
+    
+    ; Check if scanf succeeded (returns number of items read)
+    cmp eax, 1
+    jne .invalid_input
+    
     call clear_stdin_buffer
     
     mov eax, [choice]
@@ -99,6 +110,8 @@ menu:
     cmp eax, 5
     je exit
     
+.invalid_input:
+    call clear_stdin_buffer
     push invalid_msg
     call _printf
     add esp, 4
@@ -122,6 +135,11 @@ search_emp:
     push fmt_int
     call _scanf
     add esp, 8
+    
+    ; Check if scanf succeeded
+    cmp eax, 1
+    jne .invalid_input
+    
     call clear_stdin_buffer
     
     mov eax, [choice]
@@ -130,6 +148,8 @@ search_emp:
     cmp eax, 2
     je .search_by_position
     
+.invalid_input:
+    call clear_stdin_buffer
     push invalid_msg
     call _printf
     add esp, 4
@@ -395,6 +415,11 @@ display_menu_handler:
     push fmt_int
     call _scanf
     add esp, 8
+    
+    ; Check if scanf succeeded
+    cmp eax, 1
+    jne .invalid_input
+    
     call clear_stdin_buffer
     
     mov eax, [choice]
@@ -403,13 +428,173 @@ display_menu_handler:
     cmp eax, 2
     je .display_grouped
     
+.invalid_input:
+    call clear_stdin_buffer
     push invalid_msg
     call _printf
     add esp, 4
     jmp .end
     
 .display_grouped:
-    push not_impl
+    ; Check if database is empty
+    mov ecx, [count]
+    cmp ecx, 0
+    je .no_employees
+    
+    ; Outer loop: iterate through all employees
+    xor esi, esi
+.outer_loop:
+    cmp esi, ecx
+    jge .press_enter
+    
+    push ecx
+    push esi
+    
+    ; Get current employee's position
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    add edi, NAME_SIZE  ; Point to position
+    
+    ; Copy position to temp_buffer
+    push edi
+    lea eax, [temp_buffer]
+    push eax
+    call _strcpy
+    add esp, 8
+    
+    pop esi
+    pop ecx
+    
+    ; Check if we've already printed this position
+    ; by searching backwards through employees 0 to esi-1
+    test esi, esi
+    jz .new_position
+    
+    push ecx
+    push esi
+    xor edx, edx
+.check_dup:
+    cmp edx, esi
+    jge .new_position_after_check
+    
+    push ecx
+    push esi
+    push edx
+    
+    mov eax, edx
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    add edi, NAME_SIZE
+    
+    lea eax, [temp_buffer]
+    push eax
+    push edi
+    call _strcmp
+    add esp, 8
+    
+    pop edx
+    pop esi
+    pop ecx
+    
+    cmp eax, 0
+    je .skip_position  ; Already printed this position
+    
+    inc edx
+    jmp .check_dup
+    
+.new_position_after_check:
+    pop esi
+    pop ecx
+    
+.new_position:
+    ; Print position header
+    push ecx
+    push esi
+    
+    lea eax, [temp_buffer]
+    push eax
+    push display_pos_header
+    call _printf
+    add esp, 8
+    
+    pop esi
+    pop ecx
+    
+    ; Inner loop: print all employees with this position
+    push ecx
+    push esi
+    xor edx, edx
+.inner_loop:
+    cmp edx, ecx
+    jge .inner_done
+    
+    push ecx
+    push esi
+    push edx
+    
+    mov eax, edx
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    lea ebx, [edi + NAME_SIZE]
+    
+    ; Compare positions
+    lea eax, [temp_buffer]
+    push eax
+    push ebx
+    call _strcmp
+    add esp, 8
+    
+    pop edx
+    pop esi
+    pop ecx
+    
+    cmp eax, 0
+    jne .next_inner
+    
+    ; Print this employee
+    push ecx
+    push esi
+    push edx
+    
+    mov eax, edx
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    lea ebx, [edi + NAME_SIZE]
+    
+    push ebx
+    push edi
+    push fmt_display
+    call _printf
+    add esp, 12
+    
+    pop edx
+    pop esi
+    pop ecx
+    
+.next_inner:
+    inc edx
+    jmp .inner_loop
+    
+.inner_done:
+    pop esi
+    pop ecx
+    jmp .next_outer
+    
+.skip_position:
+    pop esi
+    pop ecx
+    
+.next_outer:
+    inc esi
+    jmp .outer_loop
+    
+.no_employees:
+    push no_emp_msg
     call _printf
     add esp, 4
     jmp .press_enter
