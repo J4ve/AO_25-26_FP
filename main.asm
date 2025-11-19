@@ -1,5 +1,5 @@
 ; =========================================================
-; Employee Record Tracker - Phase 1: Add + Display
+; Employee Record Tracker - Phase 2: Add + Display + Search
 ; =========================================================
 section .data
     EOF equ -1
@@ -33,15 +33,26 @@ section .data
     not_impl db "Feature not implemented yet.", 10, 0
     invalid_msg db "Invalid choice, please try again.", 10, 0
     
+    search_menu db 10, "## Search Employee ##", 10
+                db "[1] Search by Name", 10
+                db "[2] Search by Position", 10
+                db "Enter your choice: ", 0
+    
+    search_name_prompt db "Enter name to search: ", 0
+    search_pos_prompt db "Enter position to search: ", 0
+    not_found_msg db "No employees found.", 10, 0
+    found_msg db "Found employee(s):", 10, 0
+    
 section .bss
     employees resb 640      ; 10 * 64 = 640 bytes
     count resd 1
     buffer resb 64
     choice resd 1
+    found_flag resd 1       ; flag to track if any match found
     
 section .text
     global _main
-    extern _printf, _scanf, _strcpy, _getchar
+    extern _printf, _scanf, _strcpy, _getchar, _strcmp
     
 ; ---------------------------------------------------------
 ; clear_stdin_buffer: flush remaining input until newline
@@ -100,9 +111,203 @@ delete_emp:
     jmp menu
     
 search_emp:
-    push not_impl
+    push ebp
+    mov ebp, esp
+    
+    push search_menu
     call _printf
     add esp, 4
+    
+    push choice
+    push fmt_int
+    call _scanf
+    add esp, 8
+    call clear_stdin_buffer
+    
+    mov eax, [choice]
+    cmp eax, 1
+    je .search_by_name
+    cmp eax, 2
+    je .search_by_position
+    
+    push invalid_msg
+    call _printf
+    add esp, 4
+    jmp .end
+    
+.search_by_name:
+    push search_name_prompt
+    call _printf
+    add esp, 4
+    
+    push buffer
+    push fmt_str
+    call _scanf
+    add esp, 8
+    call clear_stdin_buffer
+    
+    mov dword [found_flag], 0
+    mov ecx, [count]
+    xor esi, esi
+    
+.loop_name:
+    cmp esi, ecx
+    jge .check_found
+    
+    push ecx
+    push esi
+    
+    ; Get employee name address
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    
+    ; Compare strings
+    push buffer
+    push edi
+    call _strcmp
+    add esp, 8
+    
+    pop esi
+    pop ecx
+    
+    ; If strcmp returns 0, strings match
+    cmp eax, 0
+    jne .next_name
+    
+    ; Print this employee if first match
+    cmp dword [found_flag], 0
+    jne .skip_header1
+    
+    push ecx
+    push esi
+    push found_msg
+    call _printf
+    add esp, 4
+    pop esi
+    pop ecx
+    mov dword [found_flag], 1
+    
+.skip_header1:
+    push ecx
+    push esi
+    
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    mov ebx, edi
+    add ebx, NAME_SIZE
+    
+    push ebx
+    push edi
+    push fmt_display
+    call _printf
+    add esp, 12
+    
+    pop esi
+    pop ecx
+    
+.next_name:
+    inc esi
+    jmp .loop_name
+    
+.search_by_position:
+    push search_pos_prompt
+    call _printf
+    add esp, 4
+    
+    push buffer
+    push fmt_str
+    call _scanf
+    add esp, 8
+    call clear_stdin_buffer
+    
+    mov dword [found_flag], 0
+    mov ecx, [count]
+    xor esi, esi
+    
+.loop_position:
+    cmp esi, ecx
+    jge .check_found
+    
+    push ecx
+    push esi
+    
+    ; Get employee position address
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    add edi, NAME_SIZE
+    
+    ; Compare strings
+    push buffer
+    push edi
+    call _strcmp
+    add esp, 8
+    
+    pop esi
+    pop ecx
+    
+    ; If strcmp returns 0, strings match
+    cmp eax, 0
+    jne .next_position
+    
+    ; Print this employee if first match
+    cmp dword [found_flag], 0
+    jne .skip_header2
+    
+    push ecx
+    push esi
+    push found_msg
+    call _printf
+    add esp, 4
+    pop esi
+    pop ecx
+    mov dword [found_flag], 1
+    
+.skip_header2:
+    push ecx
+    push esi
+    
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    mov ebx, edi
+    add ebx, NAME_SIZE
+    
+    push ebx
+    push edi
+    push fmt_display
+    call _printf
+    add esp, 12
+    
+    pop esi
+    pop ecx
+    
+.next_position:
+    inc esi
+    jmp .loop_position
+    
+.check_found:
+    cmp dword [found_flag], 0
+    jne .press_enter
+    push not_found_msg
+    call _printf
+    add esp, 4
+    
+.press_enter:
+    push press_enter
+    call _printf
+    add esp, 4
+    call clear_stdin_buffer
+    
+.end:
+    mov esp, ebp
+    pop ebp
     jmp menu
     
 ; ---------------------------------------------------------
