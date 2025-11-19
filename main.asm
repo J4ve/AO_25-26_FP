@@ -1,5 +1,5 @@
 ; =========================================================
-; Employee Record Tracker - Phase 4: Complete (Add + Display + Search + Delete)
+; Employee Record Tracker - Phase 5: Enhanced UI Formatting
 ; =========================================================
 section .data
     EOF equ -1
@@ -10,22 +10,27 @@ section .data
     fmt_int db "%d", 0
     fmt_str db "%31s", 0
     fmt_display db "Name: %s - Position: %s", 10, 0
+    format_employee db "  %-3d %-20s %-20s",10,0
     
-    menu_msg db 10, "## Employee Record Tracker ##", 10
-             db "[1] Add Employee", 10
-             db "[2] Delete Employee", 10
-             db "[3] Search Employee", 10
-             db "[4] Display Employees", 10
-             db "[5] Exit", 10
-             db "Enter your choice: ", 0
+    menu_title db 10,"========================================",10
+               db "      EMPLOYEE RECORD TRACKER SYSTEM",10
+               db "========================================",10,0
+    menu_opt1 db "1. Add Employee",10,0
+    menu_opt2 db "2. Delete Employee",10,0
+    menu_opt3 db "3. Search Employee",10,0
+    menu_opt4 db "4. Display Employees",10,0
+    menu_opt5 db "5. Exit",10,0
+    menu_prompt db 10,"Enter choice (1-5): ",0
     
-    display_menu db 10, "## Display Employees ##", 10
-                 db "[1] Display all employees", 10
-                 db "[2] Display employees by position", 10
-                 db "Enter your choice: ", 0
+    display_title db 10,"========================================",10
+                  db "        DISPLAY EMPLOYEES MENU",10
+                  db "========================================",10,0
+    display_opt1 db "1. Display All Employees",10,0
+    display_opt2 db "2. Display Employees by Position (Grouped)",10,0
+    display_prompt db 10,"Enter choice (1-2): ",0
     
-    name_prompt db "Enter Name: ", 0
-    pos_prompt db "Enter Position: ", 0
+    name_prompt db 10,"Enter employee name (max 31 chars): ", 0
+    pos_prompt db "Enter employee position (max 31 chars): ", 0
     db_full_msg db "Employee database is full.", 10, 0
     success_msg db "Employee added successfully!", 10, 0
     press_enter db 10, "Press Enter to continue...", 0
@@ -33,28 +38,42 @@ section .data
     not_impl db "Feature not implemented yet.", 10, 0
     invalid_msg db "Invalid choice, please try again.", 10, 0
     
-    search_menu db 10, "## Search Employee ##", 10
-                db "[1] Search by Name", 10
-                db "[2] Search by Position", 10
-                db "Enter your choice: ", 0
+    search_title db 10,"========================================",10
+                 db "         SEARCH EMPLOYEE MENU",10
+                 db "========================================",10,0
+    search_opt1 db "1. Search by Name",10,0
+    search_opt2 db "2. Search by Position",10,0
+    search_prompt db 10,"Enter choice (1-2): ",0
     
-    search_name_prompt db "Enter name to search: ", 0
-    search_pos_prompt db "Enter position to search: ", 0
+    search_name_prompt db 10,"Enter name to search: ", 0
+    search_pos_prompt db 10,"Enter position to search: ", 0
     not_found_msg db "No employees found.", 10, 0
     found_msg db "Found employee(s):", 10, 0
     
-    ; Grouped display messages
-    display_pos_header db 10, "Position: %s", 10, 0
+    ; Display headers
+    header_all db 10,"========================================",10
+               db "  NO.   NAME                  POSITION",10
+               db "========================================",10,0
+    header_search db 10,"========================================",10
+                  db "          SEARCH RESULTS",10
+                  db "========================================",10,0
+    header_grouped db 10,"========================================",10
+                   db "  EMPLOYEES GROUPED BY POSITION",10
+                   db "========================================",10,0
+    display_pos_header db 10,"Position: %s",10
+                       db "----------------------------------------",10,0
     no_emp_msg db "No employees in database.", 10, 0
     
     ; Delete messages
-    delete_menu db 10, "## Delete Employee ##", 10
-                db "[1] Delete by Name", 10
-                db "[2] Delete by Position", 10
-                db "Enter your choice: ", 0
+    delete_title db 10,"========================================",10
+                 db "         DELETE EMPLOYEE MENU",10
+                 db "========================================",10,0
+    delete_opt1 db "1. Delete by Name",10,0
+    delete_opt2 db "2. Delete by Position",10,0
+    delete_prompt db 10,"Enter choice (1-2): ",0
     
-    delete_name_prompt db "Enter name to delete: ", 0
-    delete_pos_prompt db "Enter position to delete: ", 0
+    delete_name_prompt db 10,"Enter name to delete: ", 0
+    delete_pos_prompt db 10,"Enter position to delete: ", 0
     deleted_msg db "Employee(s) deleted successfully!", 10, 0
     not_deleted_msg db "No employees deleted.", 10, 0
     
@@ -94,7 +113,31 @@ _main:
     mov dword [count], 0
     
 menu:
-    push menu_msg
+    push menu_title
+    call _printf
+    add esp, 4
+    
+    push menu_opt1
+    call _printf
+    add esp, 4
+    
+    push menu_opt2
+    call _printf
+    add esp, 4
+    
+    push menu_opt3
+    call _printf
+    add esp, 4
+    
+    push menu_opt4
+    call _printf
+    add esp, 4
+    
+    push menu_opt5
+    call _printf
+    add esp, 4
+    
+    push menu_prompt
     call _printf
     add esp, 4
     
@@ -132,7 +175,19 @@ delete_emp:
     push ebp
     mov ebp, esp
     
-    push delete_menu
+    push delete_title
+    call _printf
+    add esp, 4
+    
+    push delete_opt1
+    call _printf
+    add esp, 4
+    
+    push delete_opt2
+    call _printf
+    add esp, 4
+    
+    push delete_prompt
     call _printf
     add esp, 4
     
@@ -385,7 +440,19 @@ search_emp:
     push ebp
     mov ebp, esp
     
-    push search_menu
+    push search_title
+    call _printf
+    add esp, 4
+    
+    push search_opt1
+    call _printf
+    add esp, 4
+    
+    push search_opt2
+    call _printf
+    add esp, 4
+    
+    push search_prompt
     call _printf
     add esp, 4
     
@@ -460,7 +527,7 @@ search_emp:
     
     push ecx
     push esi
-    push found_msg
+    push header_search
     call _printf
     add esp, 4
     pop esi
@@ -480,9 +547,12 @@ search_emp:
     
     push ebx
     push edi
-    push fmt_display
+    mov eax, esi
+    inc eax
+    push eax
+    push format_employee
     call _printf
-    add esp, 12
+    add esp, 16
     
     pop esi
     pop ecx
@@ -539,7 +609,7 @@ search_emp:
     
     push ecx
     push esi
-    push found_msg
+    push header_search
     call _printf
     add esp, 4
     pop esi
@@ -559,9 +629,12 @@ search_emp:
     
     push ebx
     push edi
-    push fmt_display
+    mov eax, esi
+    inc eax
+    push eax
+    push format_employee
     call _printf
-    add esp, 12
+    add esp, 16
     
     pop esi
     pop ecx
@@ -665,7 +738,19 @@ display_menu_handler:
     push ebp
     mov ebp, esp
     
-    push display_menu
+    push display_title
+    call _printf
+    add esp, 4
+    
+    push display_opt1
+    call _printf
+    add esp, 4
+    
+    push display_opt2
+    call _printf
+    add esp, 4
+    
+    push display_prompt
     call _printf
     add esp, 4
     
@@ -699,9 +784,15 @@ display_menu_handler:
     cmp ecx, 0
     je .no_employees
     
+    ; Print grouped header
+    push header_grouped
+    call _printf
+    add esp, 4
+    
     ; Outer loop: iterate through all employees
     xor esi, esi
 .outer_loop:
+    mov ecx, [count]  ; Reload count each iteration
     cmp esi, ecx
     jge .press_enter
     
@@ -786,6 +877,7 @@ display_menu_handler:
     push esi
     xor edx, edx
 .inner_loop:
+    mov ecx, [count]  ; Reload count for comparison
     cmp edx, ecx
     jge .inner_done
     
@@ -813,7 +905,7 @@ display_menu_handler:
     cmp eax, 0
     jne .next_inner
     
-    ; Print this employee
+    ; Print this employee with number
     push ecx
     push esi
     push edx
@@ -826,9 +918,12 @@ display_menu_handler:
     
     push ebx
     push edi
-    push fmt_display
+    mov eax, edx
+    inc eax
+    push eax
+    push format_employee
     call _printf
-    add esp, 12
+    add esp, 16
     
     pop edx
     pop esi
@@ -841,15 +936,15 @@ display_menu_handler:
 .inner_done:
     pop esi
     pop ecx
-    jmp .next_outer
-    
-.skip_position:
-    pop esi
-    pop ecx
     
 .next_outer:
     inc esi
     jmp .outer_loop
+    
+.skip_position:
+    pop esi
+    pop ecx
+    jmp .next_outer
     
 .no_employees:
     push no_emp_msg
@@ -862,14 +957,16 @@ display_menu_handler:
     cmp ecx, 0
     je .press_enter
     
+    ; Print display all header
+    push header_all
+    call _printf
+    add esp, 4
+    
     xor esi, esi
 .loop:
+    mov ecx, [count]  ; Reload count each iteration
     cmp esi, ecx
     jge .press_enter
-    
-    ; Save loop counter and limit
-    push ecx
-    push esi
     
     ; Calculate address
     mov eax, esi
@@ -881,16 +978,19 @@ display_menu_handler:
     mov ebx, edi
     add ebx, NAME_SIZE
     
-    ; Print employee
+    ; Print employee with number (printf corrupts registers!)
+    push esi  ; Save loop counter
+    
     push ebx
     push edi
-    push fmt_display
+    mov eax, esi
+    inc eax
+    push eax
+    push format_employee
     call _printf
-    add esp, 12
+    add esp, 16
     
-    ; Restore loop variables
-    pop esi
-    pop ecx
+    pop esi  ; Restore loop counter
     
     inc esi
     jmp .loop
