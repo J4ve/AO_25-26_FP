@@ -18,11 +18,11 @@ section .data
     fmt_int db "%d", 0
     fmt_str db " %31[^\n]", 0
     fmt_display db "Name: %s - Position: %s", 10, 0
-    format_employee db "  %-3d %-20s %-20s",10,0
+    format_employee db "  %-3d %-30s %-30s",10,0
     
-    menu_title db 10,"========================================",10
-               db "      EMPLOYEE RECORD TRACKER SYSTEM",10
-               db "========================================",10,0
+    menu_title db 10,"===============================================================",10
+               db "                  EMPLOYEE RECORD TRACKER SYSTEM",10
+               db "===============================================================",10,0
     menu_opt1 db "1. Add Employee",10,0
     menu_opt2 db "2. Delete Employee",10,0
     menu_opt3 db "3. Search Employee",10,0
@@ -30,9 +30,9 @@ section .data
     menu_opt5 db "5. Exit",10,0
     menu_prompt db 10,"Enter choice (1-5): ",0
     
-    display_title db 10,"========================================",10
-                  db "        DISPLAY EMPLOYEES MENU",10
-                  db "========================================",10,0
+    display_title db 10,"===============================================================",10
+                  db "                     DISPLAY EMPLOYEES MENU",10
+                  db "===============================================================",10,0
     display_opt1 db "1. Display All Employees",10,0
     display_opt2 db "2. Display Employees by Position (Grouped)",10,0
     display_prompt db 10,"Enter choice (1-2): ",0
@@ -46,9 +46,9 @@ section .data
     not_impl db "Feature not implemented yet.", 10, 0
     invalid_msg db "Invalid choice, please try again.", 10, 0
     
-    search_title db 10,"========================================",10
-                 db "         SEARCH EMPLOYEE MENU",10
-                 db "========================================",10,0
+    search_title db 10,"===============================================================",10
+                 db "                     SEARCH EMPLOYEE MENU",10
+                 db "===============================================================",10,0
     search_opt1 db "1. Search by Name",10,0
     search_opt2 db "2. Search by Position",10,0
     search_prompt db 10,"Enter choice (1-2): ",0
@@ -59,23 +59,23 @@ section .data
     found_msg db "Found employee(s):", 10, 0
     
     ; Display headers
-    header_all db 10,"========================================",10
-               db "  NO.   NAME                  POSITION",10
-               db "========================================",10,0
-    header_search db 10,"========================================",10
-                  db "          SEARCH RESULTS",10
-                  db "========================================",10,0
-    header_grouped db 10,"========================================",10
-                   db "  EMPLOYEES GROUPED BY POSITION",10
-                   db "========================================",10,0
+    header_all db 10,"===============================================================",10
+               db "  NO.   NAME                         POSITION",10
+               db "===============================================================",10,0
+    header_search db 10,"===============================================================",10
+                  db "                         SEARCH RESULTS",10
+                  db "===============================================================",10,0
+    header_grouped db 10,"===============================================================",10
+                   db "                   EMPLOYEES GROUPED BY POSITION",10
+                   db "===============================================================",10,0
     display_pos_header db 10,"Position: %s",10
-                       db "----------------------------------------",10,0
+                       db "---------------------------------------------------------------",10,0
     no_emp_msg db "No employees in database.", 10, 0
     
     ; Delete messages
-    delete_title db 10,"========================================",10
-                 db "         DELETE EMPLOYEE MENU",10
-                 db "========================================",10,0
+    delete_title db 10,"===============================================================",10
+                 db "                      DELETE EMPLOYEE MENU",10
+                 db "===============================================================",10,0
     delete_opt1 db "1. Delete by Name",10,0
     delete_opt2 db "2. Delete by Position",10,0
     delete_prompt db 10,"Enter choice (1-2): ",0
@@ -84,6 +84,15 @@ section .data
     delete_pos_prompt db 10,"Enter position to delete: ", 0
     deleted_msg db "Employee(s) deleted successfully!", 10, 0
     not_deleted_msg db "No employees deleted.", 10, 0
+    
+    ; Duplicate warning messages
+    dup_warning db 10,"WARNING: An employee with name '%s' already exists!",10,0
+    dup_prompt db "Do you want to add anyway? (y/n): ",0
+    dup_cancelled db "Add operation cancelled.",10,0
+    
+    ; Input validation messages
+    input_too_long db "Error: Input exceeds 31 characters. Please try again.",10,0
+    fmt_char db " %c",0
     
     ; File mode for fdopen
     mode_read db "r", 0
@@ -94,6 +103,7 @@ section .bss
     buffer resb 64
     choice resd 1
     found_flag resd 1       ; flag to track if any match found
+    user_char resb 1        ; for y/n input
     temp_buffer resb 64     ; temporary buffer for position comparison
     position_printed resb 32 ; track which positions we've printed
     
@@ -210,6 +220,12 @@ menu:
     cmp eax, 5
     je exit
     
+    ; If we get here, choice is out of range
+    push invalid_msg
+    call _printf
+    add esp, 4
+    jmp menu
+    
 .invalid_input:
     call clear_stdin_buffer
     push invalid_msg
@@ -253,6 +269,12 @@ delete_emp:
     je .delete_by_name
     cmp eax, 2
     je .delete_by_position
+    
+    ; If we get here, choice is out of range
+    push invalid_msg
+    call _printf
+    add esp, 4
+    jmp .end
     
 .invalid_input:
     call clear_stdin_buffer
@@ -527,6 +549,12 @@ search_emp:
     cmp eax, 2
     je .search_by_position
     
+    ; If we get here, choice is out of range
+    push invalid_msg
+    call _printf
+    add esp, 4
+    jmp .end
+    
 .invalid_input:
     call clear_stdin_buffer
     push invalid_msg
@@ -735,6 +763,7 @@ add_emp:
     cmp eax, MAX_EMPLOYEES
     jge .full
     
+.get_name:
     ; Get name
     push name_prompt
     call _printf
@@ -750,6 +779,73 @@ add_emp:
     call remove_newline
     add esp, 4
     
+    ; Check length (max 31 chars)
+    push buffer
+    call _strlen
+    add esp, 4
+    cmp eax, 31
+    jg .name_too_long
+    
+    ; Check for duplicate name
+    mov ecx, [count]
+    xor esi, esi
+.check_dup_loop:
+    cmp esi, ecx
+    jge .no_duplicate
+    
+    push ecx
+    push esi
+    
+    ; Get employee name address
+    mov eax, esi
+    imul eax, EMPLOYEE_SIZE
+    lea edi, [employees]
+    add edi, eax
+    
+    ; Compare with input buffer
+    push buffer
+    push edi
+    call _strcmp
+    add esp, 8
+    
+    pop esi
+    pop ecx
+    
+    cmp eax, 0
+    je .duplicate_found
+    
+    inc esi
+    jmp .check_dup_loop
+    
+.duplicate_found:
+    ; Show warning
+    push buffer
+    push dup_warning
+    call _printf
+    add esp, 8
+    
+    push dup_prompt
+    call _printf
+    add esp, 4
+    
+    ; Get confirmation (y or n)
+    push user_char
+    push fmt_char
+    call _scanf
+    add esp, 8
+    
+    call clear_stdin_buffer
+    
+    ; Check user's choice
+    mov al, [user_char]
+    cmp al, 'y'
+    je .no_duplicate
+    cmp al, 'Y'
+    je .no_duplicate
+    jmp .cancelled
+    
+.no_duplicate:
+    
     ; Copy to employee array
     mov eax, [count]
     imul eax, EMPLOYEE_SIZE
@@ -761,6 +857,7 @@ add_emp:
     call _strcpy
     add esp, 8
     
+.get_position:
     ; Get position
     push pos_prompt
     call _printf
@@ -775,6 +872,13 @@ add_emp:
     push buffer
     call remove_newline
     add esp, 4
+    
+    ; Check length (max 31 chars)
+    push buffer
+    call _strlen
+    add esp, 4
+    cmp eax, 31
+    jg .position_too_long
     
     ; Copy position (offset +32)
     add edi, NAME_SIZE
@@ -800,6 +904,26 @@ add_emp:
     mov esp, ebp
     pop ebp
     jmp menu
+    
+.cancelled:
+    push dup_cancelled
+    call _printf
+    add esp, 4
+    mov esp, ebp
+    pop ebp
+    jmp menu
+
+.name_too_long:
+    push input_too_long
+    call _printf
+    add esp, 4
+    jmp .get_name
+
+.position_too_long:
+    push input_too_long
+    call _printf
+    add esp, 4
+    jmp .get_position
     
 ; ---------------------------------------------------------
 ; display_menu_handler: handle display submenu
@@ -840,6 +964,12 @@ display_menu_handler:
     je .display_all
     cmp eax, 2
     je .display_grouped
+    
+    ; If we get here, choice is out of range
+    push invalid_msg
+    call _printf
+    add esp, 4
+    jmp .end
     
 .invalid_input:
     call clear_stdin_buffer
