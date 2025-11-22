@@ -64,6 +64,8 @@ section .data
                db "===============================================================",10,0
     header_search db 10,"===============================================================",10
                   db "                         SEARCH RESULTS",10
+                  db "===============================================================",10
+                  db "  NO.   NAME                         POSITION",10
                   db "===============================================================",10,0
     header_grouped db 10,"===============================================================",10
                    db "                   EMPLOYEES GROUPED BY POSITION",10
@@ -132,6 +134,81 @@ remove_newline:
     jne .done
     mov byte [esi], 0
 .done:
+    mov esp, ebp
+    pop ebp
+    ret
+
+; ---------------------------------------------------------
+; trim_string: remove leading and trailing spaces
+; ---------------------------------------------------------
+trim_string:
+    push ebp
+    mov ebp, esp
+    push esi
+    push edi
+    push ebx
+    
+    mov esi, [ebp+8]  ; source string
+    
+    ; Skip leading spaces
+.skip_leading:
+    mov al, [esi]
+    cmp al, 0
+    je .empty_or_all_spaces
+    cmp al, 32  ; space
+    jne .found_start
+    inc esi
+    jmp .skip_leading
+    
+.found_start:
+    ; Find end of string
+    mov edi, esi
+    xor ebx, ebx  ; ebx = length counter
+.find_end:
+    mov al, [edi]
+    cmp al, 0
+    je .trim_trailing
+    inc edi
+    inc ebx
+    jmp .find_end
+    
+.trim_trailing:
+    ; edi points to null terminator, go back to find last non-space
+    test ebx, ebx
+    jz .empty_or_all_spaces
+    dec edi
+.remove_trailing:
+    cmp edi, esi
+    jb .done_trimming
+    mov al, [edi]
+    cmp al, 32
+    jne .done_trimming
+    mov byte [edi], 0
+    dec edi
+    jmp .remove_trailing
+    
+.done_trimming:
+    ; Now shift the trimmed string to the beginning if needed
+    mov edi, [ebp+8]  ; destination (original pointer)
+    cmp esi, edi
+    je .already_at_start
+.shift_loop:
+    mov al, [esi]
+    mov [edi], al
+    test al, al
+    jz .already_at_start
+    inc esi
+    inc edi
+    jmp .shift_loop
+    
+.empty_or_all_spaces:
+    mov edi, [ebp+8]
+    mov byte [edi], 0
+    
+.already_at_start:
+    pop ebx
+    pop edi
+    pop esi
     mov esp, ebp
     pop ebp
     ret
@@ -298,6 +375,10 @@ delete_emp:
     call remove_newline
     add esp, 4
     
+    push buffer
+    call trim_string
+    add esp, 4
+    
     mov dword [found_flag], 0
     mov ecx, [count]
     xor esi, esi
@@ -398,6 +479,10 @@ delete_emp:
     
     push buffer
     call remove_newline
+    add esp, 4
+    
+    push buffer
+    call trim_string
     add esp, 4
     
     mov dword [found_flag], 0
@@ -577,6 +662,10 @@ search_emp:
     call remove_newline
     add esp, 4
     
+    push buffer
+    call trim_string
+    add esp, 4
+    
     mov dword [found_flag], 0
     mov ecx, [count]
     xor esi, esi
@@ -660,6 +749,10 @@ search_emp:
     
     push buffer
     call remove_newline
+    add esp, 4
+    
+    push buffer
+    call trim_string
     add esp, 4
     
     mov dword [found_flag], 0
@@ -779,6 +872,10 @@ add_emp:
     call remove_newline
     add esp, 4
     
+    push buffer
+    call trim_string
+    add esp, 4
+    
     ; Check length (max 31 chars)
     push buffer
     call _strlen
@@ -871,6 +968,10 @@ add_emp:
     
     push buffer
     call remove_newline
+    add esp, 4
+    
+    push buffer
+    call trim_string
     add esp, 4
     
     ; Check length (max 31 chars)
