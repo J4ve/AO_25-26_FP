@@ -19,6 +19,7 @@ section .data
     fmt_str db " %31[^\n]", 0
     fmt_display db "Name: %s - Position: %s", 10, 0
     format_employee db "  %-3d %-30s %-30s",10,0
+    format_employee_grouped db "  %-3d %-30s",10,0
     
     menu_title db 10,"===============================================================",10
                db "                  EMPLOYEE RECORD TRACKER SYSTEM",10
@@ -1206,7 +1207,7 @@ display_menu_handler:
     cmp eax, 0
     jne .next_inner
     
-    ; Print this employee with number
+    ; Print this employee with number (name only, position already in header)
     push ecx
     push esi
     push edx
@@ -1215,16 +1216,14 @@ display_menu_handler:
     imul eax, EMPLOYEE_SIZE
     lea edi, [employees]
     add edi, eax
-    lea ebx, [edi + NAME_SIZE]
     
-    push ebx
     push edi
     mov eax, edx
     inc eax
     push eax
-    push format_employee
+    push format_employee_grouped
     call _printf
-    add esp, 16
+    add esp, 12
     
     pop edx
     pop esi
