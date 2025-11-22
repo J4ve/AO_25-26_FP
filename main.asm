@@ -11,7 +11,7 @@
 ; =========================================================
 section .data
     EOF equ -1
-    MAX_EMPLOYEES equ 10
+    MAX_EMPLOYEES equ 500  ; we can change the employee limit to whatever, as long as we also change (employees resb) 32000 == (500)64
     EMPLOYEE_SIZE equ 64
     NAME_SIZE equ 32
     
@@ -39,7 +39,7 @@ section .data
     
     name_prompt db 10,"Enter employee name (max 31 chars): ", 0
     pos_prompt db "Enter employee position (max 31 chars): ", 0
-    db_full_msg db "Employee database is full.", 10, 0
+    db_full_msg db "Employee database is full (maximum 500 employees).", 10, 0
     success_msg db "Employee added successfully!", 10, 0
     press_enter db 10, "Press Enter to continue...", 0
     exit_msg db "Exiting program.", 10, 0
@@ -100,7 +100,7 @@ section .data
     mode_read db "r", 0
     
 section .bss
-    employees resb 640      ; 10 * 64 = 640 bytes
+    employees resb 32000    ; 500 * 64 = 32000 bytes
     count resd 1
     buffer resb 64
     choice resd 1
