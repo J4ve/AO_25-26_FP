@@ -1,6 +1,6 @@
 # Architecture and Organization Final Project
 
-[Document](https://docs.google.com/document/d/1R6AQQbYqJi5osiLXs_nGPCNXFPG_qnHWZxikHWBiQ4U/edit?usp=sharing)
+[Document]((Group5_BSCS3A_Bacsain_Bongalos_Ortinero_Ricafort.pdf))
 
 # Requirements:
 
