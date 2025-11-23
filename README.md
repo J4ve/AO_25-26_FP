@@ -52,7 +52,7 @@ Be sure when you explain, your faces can be seen in the video. All members shoul
 - **Menu validation**: Handles invalid input and out-of-range choices
 - **Input validation**: Enforces 31-character limit with re-prompting
 - **Database capacity**: Prevents adding beyond 500 employees
-- **Empty checks**: Validates operations on empty database
+- **Empty database checks**: All operations validate database is not empty before proceeding
 - **Buffer management**: Properly clears stdin to prevent input carryover
 
 ### Technical Details

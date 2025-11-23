@@ -315,6 +315,11 @@ delete_emp:
     push ebp
     mov ebp, esp
     
+    ; Check if database is empty
+    mov eax, [count]
+    cmp eax, 0
+    je .no_employees
+    
     push delete_title
     call _printf
     add esp, 4
@@ -592,6 +597,16 @@ delete_emp:
     call _printf
     add esp, 4
     call clear_stdin_buffer
+    jmp .end
+    
+.no_employees:
+    push no_emp_msg
+    call _printf
+    add esp, 4
+    push press_enter
+    call _printf
+    add esp, 4
+    call clear_stdin_buffer
     
 .end:
     mov esp, ebp
@@ -601,6 +616,11 @@ delete_emp:
 search_emp:
     push ebp
     mov ebp, esp
+    
+    ; Check if database is empty
+    mov eax, [count]
+    cmp eax, 0
+    je .no_employees
     
     push search_title
     call _printf
@@ -839,6 +859,16 @@ search_emp:
     call _printf
     add esp, 4
     call clear_stdin_buffer
+    jmp .end
+    
+.no_employees:
+    push no_emp_msg
+    call _printf
+    add esp, 4
+    push press_enter
+    call _printf
+    add esp, 4
+    call clear_stdin_buffer
     
 .end:
     mov esp, ebp
@@ -1033,6 +1063,11 @@ add_emp:
 display_menu_handler:
     push ebp
     mov ebp, esp
+    
+    ; Check if database is empty
+    mov eax, [count]
+    cmp eax, 0
+    je .no_employees
     
     push display_title
     call _printf
